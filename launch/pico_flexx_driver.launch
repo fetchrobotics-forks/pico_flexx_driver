@@ -4,7 +4,7 @@
   <!-- ID of the sensor that should be used. IDs of all connected devices are listed on startup. -->
   <arg name="sensor"             default=""/>
   <!-- ID of the operation mode A list of supported modes is listed on startup. -->
-  <arg name="operation_mode"     default="0"/>
+  <arg name="use_case"           default="MODE_9_5FPS_2000"/>
   <!-- Enable or disable automatic expusure. -->
   <arg name="automatic_exposure" default="true"/>
   <!-- Exposure time. Only for manual exposure. -->
@@ -45,7 +45,7 @@
         respawn="true" output="screen">
     <param name="base_name"          type="str"    value="$(arg base_name)"/>
     <param name="sensor"             type="str"    value="$(arg sensor)"/>
-    <param name="operation_mode"     type="int"    value="$(arg operation_mode)"/>
+    <param name="use_case"           type="str"    value="$(arg use_case)"/>
     <param name="automatic_exposure" type="bool"   value="$(arg automatic_exposure)"/>
     <param name="exposure_time"      type="int"    value="$(arg exposure_time)"/>
     <param name="max_noise"          type="double" value="$(arg max_noise)"/>
