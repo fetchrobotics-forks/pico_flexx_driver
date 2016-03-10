@@ -47,7 +47,7 @@
 #define PF_TOPIC_INFO       "/camera_info"
 #define PF_TOPIC_MONO8      "/image_mono8"
 #define PF_TOPIC_MONO16     "/image_mono16"
-#define PF_TOPIC_DEPTH      "/image_depth"
+#define PF_TOPIC_DEPTH      "/image_raw"
 #define PF_TOPIC_NOISE      "/image_noise"
 #define PF_TOPIC_CLOUD      "/points"
 
@@ -756,7 +756,7 @@ private:
     msgCloud->is_dense = false;
     msgCloud->point_step = (uint32_t)(5 * sizeof(float));
     msgCloud->row_step = (uint32_t)(5 * sizeof(float) * data.width);
-    msgCloud->fields.resize(6);
+    msgCloud->fields.resize(5);
     msgCloud->fields[0].name = "x";
     msgCloud->fields[0].offset = 0;
     msgCloud->fields[0].datatype = sensor_msgs::PointField::FLOAT32;
@@ -775,12 +775,12 @@ private:
     msgCloud->fields[3].count = 1;
     msgCloud->fields[4].name = "intensity";
     msgCloud->fields[4].offset = msgCloud->fields[3].offset + sizeof(float);
-    msgCloud->fields[4].datatype = sensor_msgs::PointField::UINT16;
+    msgCloud->fields[4].datatype = sensor_msgs::PointField::FLOAT32; //UINT16;
     msgCloud->fields[4].count = 1;
-    msgCloud->fields[5].name = "gray";
-    msgCloud->fields[5].offset = msgCloud->fields[4].offset + sizeof(uint16_t);
-    msgCloud->fields[5].datatype = sensor_msgs::PointField::UINT8;
-    msgCloud->fields[5].count = 1;
+    //msgCloud->fields[5].name = "gray";
+    //msgCloud->fields[5].offset = msgCloud->fields[4].offset + sizeof(float); //uint16_t);
+    //msgCloud->fields[5].datatype = sensor_msgs::PointField::UINT8;
+    //msgCloud->fields[5].count = 1;
     msgCloud->data.resize(5 * sizeof(float) * data.points.size());
 
     const float invalid = std::numeric_limits<float>::quiet_NaN();
@@ -789,13 +789,14 @@ private:
     float *itCY = itCX + 1;
     float *itCZ = itCY + 1;
     float *itCN = itCZ + 1;
-    uint16_t *itCM = (uint16_t *)(itCN + 1);
+    //uint16_t *itCM = (uint16_t *)(itCN + 1);
+    float *itCM = itCN + 1;
     float *itD = (float *)&msgDepth->data[0];
     float *itN = (float *)&msgNoise->data[0];
-    uint16_t *itM = (uint16_t *)&msgMono16->data[0];
-    for(size_t i = 0; i < data.points.size(); ++i, ++itI, itCX += 5, itCY += 5, itCZ += 5, itCN += 5, itCM += 10, ++itD, ++itM, ++itN)
+    //uint16_t *itM = (uint16_t *)&msgMono16->data[0];
+    for(size_t i = 0; i < data.points.size(); ++i, ++itI, itCX += 5, itCY += 5, itCZ += 5, itCN += 5, itCM += 5, ++itD, /*++itM,*/ ++itN)
     {
-      if(itI->depthConfidence && itI->noise < maxNoise)
+      if(itI->depthConfidence && itI->noise < maxNoise && itI->grayValue > 5)
       {
         *itCX = itI->x;
         *itCY = itI->y;
@@ -810,11 +811,11 @@ private:
         *itCY = invalid;
         *itCZ = invalid;
         *itCN = 0.0f;
-        *itD = 0.0f;
+        *itD = 25.0f; //0.0f;
         *itN = 0.0f;
       }
       *itCM = itI->grayValue;
-      *itM = itI->grayValue;
+//      *itM = itI->grayValue;
     }
 
     computeMono8(msgMono16, msgMono8, msgCloud);
