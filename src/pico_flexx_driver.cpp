@@ -213,35 +213,22 @@ public:
     cvNewData.notify_one();
   }
 
-  void onNewExposure(const royale::Vector<uint32_t> &newExposureTimes)
+  void onNewExposure(const uint32_t newExposureTime)
   {
-    if(exposureTimes.size() == newExposureTimes.size())
+    if (!exposureTimes.empty() &&
+        newExposureTime == exposureTimes[0])
     {
-      bool same = true;
-      for(size_t i = 0; i < exposureTimes.size(); ++i)
-      {
-        same = same && newExposureTimes[i] == exposureTimes[i];
-      }
-      if(same)
-      {
-        return;
-      }
+      return;
     }
 
-    exposureTimes.resize(newExposureTimes.size());
+    exposureTimes.resize(1);
     std::ostringstream oss;
-    for(size_t i = 0; i < exposureTimes.size(); ++i)
-    {
-      exposureTimes[i] = newExposureTimes[i];
-      oss << (i != 0 ? ", " : "") << FG_YELLOW << exposureTimes[i] << NO_COLOR;
-    }
+    exposureTimes[0] = newExposureTime;
+    oss << FG_YELLOW << exposureTimes[0] << NO_COLOR;
     OUT_DEBUG("exposure changed: " << oss.str());
 
-    if(!newExposureTimes.empty())
-    {
-      config.exposure_time = newExposureTimes[0];
-      server.updateConfig(config);
-    }
+    config.exposure_time = newExposureTime;
+    server.updateConfig(config);
   }
 
   void callbackTopicStatus()
