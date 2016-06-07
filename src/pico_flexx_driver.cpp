@@ -134,6 +134,18 @@ private:
   double rangeFactor;
   std::thread threadProcess;
 
+  // Number of processing iterations since startup (capped at startup_ignore_iters)
+  int iters_since_start;
+  // Number of iterations since we actually saw data
+  int iters_since_data;
+
+  // Constant limits for the above
+  // TODO(enhancement): Make this params... somewhere...
+  // Number of processing iterations after initial startup to ignore before testing for dropout
+  static const int startup_ignore_iters = 15;
+  // Number of dropped iterations to allow before reporting that driver is not current
+  static const int dropout_allow_iters = 5;
+
 public:
   PicoFlexx(const ros::NodeHandle &nh = ros::NodeHandle(), const ros::NodeHandle &priv_nh = ros::NodeHandle("~"))
     : royale::IDepthDataListener(), royale::IExposureListener(), nh(nh), priv_nh(priv_nh), server(lockServer)
@@ -339,6 +351,14 @@ public:
     }
   }
 
+  // Report whether the driver is currently functioning and getting data
+  bool isCurrent()
+  {
+    // Say we're current if we're under the allowed dropout or we just started up
+    // and are still waiting for things to settle before monitoring
+    return (iters_since_data < dropout_allow_iters) || (iters_since_start < startup_ignore_iters);
+  }
+
 private:
 
   bool initialize()
@@ -385,6 +405,7 @@ private:
        || !getCameraSettings(params)
        || !createCameraInfo(params))
     {
+      OUT_ERROR("could not select camera");
       return false;
     }
 
@@ -419,6 +440,9 @@ private:
     dynamic_reconfigure::Server<pico_flexx_driver::pico_flexx_driverConfig>::CallbackType f;
     f = boost::bind(&PicoFlexx::callbackConfig, this, _1, _2);
     server.setCallback(f);
+
+    iters_since_data = 0;
+    iters_since_start = 0;
 
     return true;
   }
@@ -661,10 +685,21 @@ private:
     std::unique_lock<std::mutex> lock(lockData);
     while(running && ros::ok())
     {
+      // Increment our startup iterations but cap at the max so we don't have to worry about overflow
+      if (iters_since_start <= startup_ignore_iters)
+      {
+        iters_since_start++;
+      }
+
       if(!cvNewData.wait_for(lock, std::chrono::milliseconds(300), [this] { return this->newData; }))
       {
+        // Increment to mark that we didn't get data in time this time
+        iters_since_data++;
         continue;
       }
+
+      // If we got this far, we got data, so reset out counter
+      iters_since_data = 0;
 
       start = std::chrono::high_resolution_clock::now();
       this->data.swap(data);
@@ -883,6 +918,24 @@ public:
   {
     picoFlexx = new PicoFlexx(getNodeHandle(), getPrivateNodeHandle());
     picoFlexx->start();
+
+
+    ros::Rate loop_rate(2);
+    while (ros::ok())
+    {
+      if (!picoFlexx->isCurrent())
+      {
+        OUT_ERROR("Driver appears to have died, attempting to restart internally...");
+        picoFlexx->stop();
+        delete picoFlexx;
+        ros::Duration(1.0).sleep();
+        picoFlexx = new PicoFlexx(getNodeHandle(), getPrivateNodeHandle());
+        picoFlexx->start();
+        ros::Duration(1.0).sleep();
+      }
+
+      loop_rate.sleep();
+    }
   }
 };
 
